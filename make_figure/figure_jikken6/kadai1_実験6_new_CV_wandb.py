@@ -7,7 +7,7 @@ import wandb
 import numpy as np
 import random
 
-# --- 1. シード固定関数 ---
+#  シード固定関数
 def fix_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -17,13 +17,12 @@ def fix_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-# --- 2. モデル定義（転移学習） ---
+# モデル定義（転移学習
 def create_model(device):
     model = models.efficientnet_v2_s(weights=models.EfficientNet_V2_S_Weights.DEFAULT)
     model.classifier[1] = nn.Linear(model.classifier[1].in_features, 10)
     return model.to(device)
 
-# --- 3. 学習・評価用ヘルパー関数（必須！） ---
 def train_one_epoch(dataloader, model, loss_fn, optimizer, device):
     model.train(); total_loss = 0
     for X, y in dataloader:
@@ -42,13 +41,13 @@ def evaluate(dataloader, model, loss_fn, device):
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
     return loss / len(dataloader), correct / len(dataloader.dataset)
 
-# --- 4. メイン処理 ---
+#  メイン処理
 def main():
     seed_value = 42
     fix_seed(seed_value)
     device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
     
-    # Transform設定
+    # Transform
     train_transform = transforms.Compose([
         transforms.Resize(128),
         transforms.RandomHorizontalFlip(p=0.5),
@@ -76,7 +75,6 @@ def main():
     for fold, (train_idx, val_idx) in enumerate(kf.split(range(len(train_ds_full)))):
         print(f"\n>>> Fold {fold+1}/5")
         
-        # wandb configにpatienceを追加
         wandb.init(
             project="fashion-mnist-efficientnet",
             group="EfficientNet-V2-Transfer",
@@ -85,7 +83,7 @@ def main():
                 "lr": 6.886128605289248e-06, 
                 "batch_size": 32, 
                 "epochs": 20,
-                "patience": 5 # ここを追加！
+                "patience": 5 
             }
         )
 
@@ -138,7 +136,6 @@ def main():
                 if error_count < 30:
                     for i in range(len(y_dev)):
                         if preds[i] != y_dev[i] and error_count < 30:
-                            # 表示用に1チャンネルだけ抜き出し、正規化を戻すイメージで処理
                             img = X[i][0].cpu().numpy() 
                             error_table.add_data(
                                 wandb.Image(img), 
