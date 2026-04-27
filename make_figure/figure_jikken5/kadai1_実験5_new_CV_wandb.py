@@ -7,7 +7,7 @@ import numpy as np
 import random
 import wandb
 
-# --- 1. シード固定関数 ---
+# 1. シード固定関数
 def fix_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -17,7 +17,7 @@ def fix_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-# --- 3. モデル定義（Batch Normalizationを追加） ---
+# モデル定義
 class ConvolutionalNeuralNetwork(nn.Module):
     def __init__(self):
         super().__init__()
@@ -49,7 +49,7 @@ class ConvolutionalNeuralNetwork(nn.Module):
         logits = self.fc_stack(x)
         return logits
 
-# --- 学習・評価関数（変更なし） ---
+#学習・評価関数
 def train_one_epoch(dataloader, model, loss_fn, optimizer, device):
     model.train(); total_loss = 0
     for X, y in dataloader:
@@ -68,7 +68,7 @@ def evaluate(dataloader, model, loss_fn, device):
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
     return loss / len(dataloader), correct / len(dataloader.dataset)
 
-# --- 4. メイン処理 ---
+# メイン処理 
 def main():
     seed_value = 42
     fix_seed(seed_value)
@@ -112,7 +112,7 @@ def main():
         best_val_loss = float('inf')
         counter = 0
 
-        # --- 学習ループ ---
+        # 学習ループ 
         for epoch in range(wandb.config.epochs):
             tr_loss = train_one_epoch(train_loader, model, loss_fn, optimizer, device)
             val_loss, val_acc = evaluate(val_loader, model, loss_fn, device)
@@ -126,7 +126,7 @@ def main():
                 counter += 1
                 if counter >= wandb.config.patience: break
 
-        # --- 最終評価 ＆ 誤分類調査 ---
+        # 最終評価 ＆ 誤分類調査 
         model.load_state_dict(torch.load(f"best_model_fold{fold+1}.pth"))
         test_loss, test_acc = evaluate(test_loader, model, loss_fn, device)
         wandb.run.summary["test_accuracy"] = test_acc
@@ -146,7 +146,7 @@ def main():
                 all_preds.extend(preds.cpu().numpy())
                 all_labels.extend(y.cpu().numpy())
 
-                # 誤分類画像を特定して wandb Table に追加 (最初の30件程度)
+                # 誤分類画像を特定してwandb Tableに追加 
                 if error_count < 30:
                     for i in range(len(y)):
                         if preds[i] != y[i] and error_count < 30:
@@ -161,7 +161,7 @@ def main():
 
         wandb.log({
             "confusion_matrix": wandb.plot.confusion_matrix(y_true=all_labels, preds=all_preds, class_names=classes),
-            "error_examples": error_table # 誤分類リストをアップロード
+            "error_examples": error_table
         })
         
         fold_accuracies.append(test_acc)
