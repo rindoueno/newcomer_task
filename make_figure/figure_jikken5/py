@@ -1,0 +1,56 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+import pandas as pd
+
+base_dir = os.path.dirname(__file__)
+os.chdir(base_dir)
+
+# CSVデータの読み込み（wandbからエクスポートしたファイル名に合わせてください）
+df_train_loss = pd.read_csv("/home/user/program/make_figure/figure_jikken5/wandb_export_2026-04-24T18_09_08.197+09_00.csv")
+df_val_loss = pd.read_csv("/home/user/program/make_figure/figure_jikken5/wandb_export_2026-04-24T18_08_58.757+09_00.csv")
+df_val_acc = pd.read_csv("/home/user/program/make_figure/figure_jikken5/wandb_export_2026-04-24T18_09_04.314+09_00.csv")
+df_cm = pd.read_csv("/home/user/program/make_figure/figure_jikken5/wandb_export_2026-04-24T18_09_16.809+09_00.csv")
+
+# ステップ（Epoch）を基準にデータを結合
+df_curves = df_train_loss[['Step', 'fold-1 - train_loss']].merge(
+    df_val_loss[['Step', 'fold-1 - val_loss']], on='Step'
+).merge(
+    df_val_acc[['Step', 'fold-1 - val_acc']], on='Step'
+)
+
+# --- グラフ描画 ---
+plt.figure(figsize=(12, 5))
+
+# 1. 損失グラフ（Loss Curve）
+plt.subplot(1, 2, 1)
+plt.plot(df_curves['Step'] + 1, df_curves['fold-1 - train_loss'], label='Train Loss', marker='o')
+plt.plot(df_curves['Step'] + 1, df_curves['fold-1 - val_loss'], label='Val Loss', marker='o')
+plt.title('Fold 1: Loss Curve')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+plt.grid(True, linestyle='--', alpha=0.6)
+
+# 2. 正解率グラフ（Accuracy Curve）
+plt.subplot(1, 2, 2)
+plt.plot(df_curves['Step'] + 1, df_curves['fold-1 - val_acc'], label='Val Accuracy', color='green', marker='o')
+plt.title('Fold 1: Accuracy Curve')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.grid(True, linestyle='--', alpha=0.6)
+
+plt.tight_layout()
+plt.savefig("Fold5_Accuracy_Curve.pdf")
+
+# --- 混同行列の描画 ---
+cm_pivot = df_cm.pivot(index='Actual', columns='Predicted', values='nPredictions')
+labels = ["T-shirt/top", "Trouser", "Pullover", "Dress", "Coat", "Sandal", "Shirt", "Sneaker", "Bag", "Ankle boot"]
+cm_pivot = cm_pivot.reindex(index=labels, columns=labels).fillna(0)
+
+plt.figure(figsize=(10, 8))
+sns.heatmap(cm_pivot, annot=True, fmt='g', cmap='Blues')
+plt.title('Fold 1: Confusion Matrix')
+plt.savefig("Fold5_Confusion_Matrix.pdf")
