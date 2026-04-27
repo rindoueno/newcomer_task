@@ -8,7 +8,7 @@ import numpy as np
 import random
 import wandb
 
-# --- 1. シード固定関数 ---
+#1. シード固定関数
 def fix_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -18,13 +18,13 @@ def fix_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-# --- 2. データの準備 ---
+#2. データの準備
 transform = transforms.ToTensor()
 full_train_data = datasets.FashionMNIST(root="data", train=True, download=True, transform=transform)
 test_data = datasets.FashionMNIST(root="data", train=False, download=True, transform=transform)
 classes = full_train_data.classes
 
-# --- 3. モデル・学習・評価関数の定義 ---
+#3. モデル・学習・評価関数の定義
 class ConvolutionalNeuralNetwork(nn.Module):
         def __init__(self):
             super().__init__()
@@ -40,7 +40,7 @@ class ConvolutionalNeuralNetwork(nn.Module):
                 nn.ReLU(),
                 nn.MaxPool2d(kernel_size=2, stride=2), # 14x14 -> 7x7
             )
-            # 全結合層（分類用）
+            # 全結合層
             self.flatten = nn.Flatten()
             self.fc_stack = nn.Sequential(
                 nn.Linear(64 * 7 * 7, 512),
@@ -72,7 +72,7 @@ def evaluate(dataloader, model, loss_fn, device):
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
     return loss / len(dataloader), correct / len(dataloader.dataset)
 
-# --- 4. メイン処理 ---
+#4. メイン処理
 def main():
     seed_value = 42
     fix_seed(seed_value)
@@ -127,11 +127,11 @@ def main():
                 counter += 1
                 if counter >= config.patience: break
 
-        # 【追加】最終評価と混同行列の作成
+        #最終評価と混同行列の作成
         model.load_state_dict(torch.load(f"best_model_fold{fold+1}.pth"))
         test_loss, test_acc = evaluate(test_loader, model, loss_fn, device)
         
-        # テストセットでの予測を全回収
+        # テストセットでの予測
         all_preds, all_labels = [], []
         model.eval()
         with torch.no_grad():
@@ -140,7 +140,7 @@ def main():
                 all_preds.extend(model(X).argmax(1).cpu().numpy())
                 all_labels.extend(y.cpu().numpy())
 
-        # wandbにテスト精度と混同行列を送信
+        # wandbにテスト精度と混同行列
         wandb.run.summary["test_accuracy"] = test_acc
         wandb.log({"confusion_matrix": wandb.plot.confusion_matrix(
             probs=None, y_true=all_labels, preds=all_preds, class_names=classes
