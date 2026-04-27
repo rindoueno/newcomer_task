@@ -8,7 +8,7 @@ import numpy as np
 import random
 import wandb
 
-# --- 1. シード固定関数 ---
+# 1. シード固定関数
 def fix_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -18,7 +18,7 @@ def fix_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-# --- 2. データの準備 ---
+# 2. データの準備 
 def get_dataloaders():
     # 1. 訓練用：データ拡張を行う
     train_transform = transforms.Compose([
@@ -32,7 +32,7 @@ def get_dataloaders():
         transforms.ToTensor(),
     ])
 
-    # 訓練用データを読み込む（後で分割するので、ここでは一旦共通のtransformでも良いですが
+    # 訓練用データを読み込む
     full_train_dataset = datasets.FashionMNIST(root="data", train=True, download=True, transform=train_transform)
     test_dataset = datasets.FashionMNIST(root="data", train=False, download=True, transform=test_transform)
 
@@ -41,8 +41,6 @@ def get_dataloaders():
     val_size = 10000
     train_subset, val_subset = random_split(full_train_dataset, [train_size, val_size])
 
-    # 【さらにこだわりポイント】
-    # Subsetを使うと親のtransform（拡張あり）を引き継いでしまうので、
     import copy
     val_subset.dataset = copy.copy(full_train_dataset)
     val_subset.dataset.transform = test_transform 
@@ -53,7 +51,7 @@ def get_dataloaders():
     
     return train_loader, val_loader, test_loader
 
-# --- 3. モデル・学習・評価関数の定義 ---
+# モデル・学習・評価関数の定義
 class ConvolutionalNeuralNetwork(nn.Module):
         def __init__(self):
             super().__init__()
@@ -69,7 +67,7 @@ class ConvolutionalNeuralNetwork(nn.Module):
                 nn.ReLU(),
                 nn.MaxPool2d(kernel_size=2, stride=2), # 14x14 -> 7x7
             )
-            # 全結合層（分類用）
+            # 全結合
             self.flatten = nn.Flatten()
             self.fc_stack = nn.Sequential(
                 nn.Linear(64 * 7 * 7, 512),
@@ -101,7 +99,7 @@ def evaluate(dataloader, model, loss_fn, device):
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
     return loss / len(dataloader), correct / len(dataloader.dataset)
 
-# --- 4. メイン処理 ---
+# 4. メイン処理
 def main():
     seed_value = 42
     fix_seed(seed_value)
@@ -109,20 +107,17 @@ def main():
     project_name = "fashion-mnist-kfold-cnn-augm"
     group_name = "CNN-5-Fold-Augmentation"
     device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-    
-    # 【修正ポイント1】2種類のデータセットを用意する
+  
     # 訓練用（データ拡張あり）
     train_transform = transforms.Compose([
         transforms.RandomHorizontalFlip(p=0.5),
         transforms.RandomRotation(10),
         transforms.ToTensor(),
     ])
-    # 検証・テスト用（データ拡張なし）
+    # 検証・テスト用
     val_transform = transforms.Compose([
         transforms.ToTensor(),
     ])
-
-    # 同じデータを指すが、transformだけ違う2つのインスタンスを作る
     train_dataset_full = datasets.FashionMNIST(root="data", train=True, download=True, transform=train_transform)
     val_dataset_full = datasets.FashionMNIST(root="data", train=True, download=True, transform=val_transform)
     test_data = datasets.FashionMNIST(root="data", train=False, download=True, transform=val_transform)
@@ -133,7 +128,6 @@ def main():
     kf = KFold(n_splits=k_folds, shuffle=True, random_state=seed_value)
     fold_accuracies = []
 
-    # kf.split はインデックスだけを返すので、これを利用して使い分ける
     for fold, (train_idx, val_idx) in enumerate(kf.split(range(len(train_dataset_full)))):
         print(f"\n>>> Fold {fold+1}/{k_folds}")
         
@@ -142,7 +136,6 @@ def main():
             config={"learning_rate":0.001809, "batch_size": 64, "epochs": 100, "patience": 5}
         )
 
-        # 【修正ポイント2】インデックスを使って、訓練は「拡張あり」から、検証は「拡張なし」から取り出す
         train_loader = DataLoader(Subset(train_dataset_full, train_idx), batch_size=wandb.config.batch_size, shuffle=True)
         val_loader = DataLoader(Subset(val_dataset_full, val_idx), batch_size=wandb.config.batch_size, shuffle=False)
         test_loader = DataLoader(test_data, batch_size=wandb.config.batch_size, shuffle=False)
@@ -167,11 +160,11 @@ def main():
                 counter += 1
                 if counter >= wandb.config.patience: break
 
-        # 【追加】最終評価と混同行列の作成
+        # 最終評価と混同行列の作成
         model.load_state_dict(torch.load(f"best_model_fold{fold+1}.pth"))
         test_loss, test_acc = evaluate(test_loader, model, loss_fn, device)
         
-        # テストセットでの予測を全回収
+        # テストセットでの予測
         all_preds, all_labels = [], []
         model.eval()
         with torch.no_grad():
@@ -180,7 +173,7 @@ def main():
                 all_preds.extend(model(X).argmax(1).cpu().numpy())
                 all_labels.extend(y.cpu().numpy())
 
-        # wandbにテスト精度と混同行列を送信
+        # wandbにテスト精度と混同行列
         wandb.run.summary["test_accuracy"] = test_acc
         wandb.log({"confusion_matrix": wandb.plot.confusion_matrix(
             probs=None, y_true=all_labels, preds=all_preds, class_names=classes
